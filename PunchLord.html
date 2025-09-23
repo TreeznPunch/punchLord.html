@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Punch Admin — Panel</title>
+<style>
+  :root{
+    --bg:#000;
+    --neon:#39ff14;
+    --muted:#86ff9c;
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, "Roboto Mono", monospace;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(0deg,#000,#051006);color:var(--neon);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  *{box-sizing:border-box}
+  .app{display:grid;grid-template-columns:260px 1fr;gap:18px;min-height:100vh;padding:20px}
+  .sidebar{background:rgba(57,255,20,0.02);border:1px solid rgba(57,255,20,0.06);padding:16px;border-radius:10px;height:calc(100vh-40px);display:flex;flex-direction:column}
+  .logo{width:44px;height:44px;border-radius:8px;background:linear-gradient(180deg,#062,#0f4);display:grid;place-items:center;font-weight:800;color:#001}
+  .menu{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+  .menu button{background:transparent;border:1px solid rgba(57,255,20,0.04);padding:10px;border-radius:8px;color:var(--neon);font-family:var(--mono);font-weight:700;text-align:left;cursor:pointer}
+  .notice{margin-top:10px;padding:8px;border-radius:6px;background:rgba(57,255,20,0.01);font-size:12px;color:#9fffb0}
+  .main{display:flex;flex-direction:column;gap:12px;height:calc(100vh-40px)}
+  .topbar{display:flex;justify-content:space-between;align-items:center}
+  .btn{background:transparent;border:1px solid rgba(57,255,20,0.08);padding:8px 12px;border-radius:8px;color:var(--neon);cursor:pointer;font-family:var(--mono);font-weight:700}
+  .btn.primary{background:linear-gradient(90deg,rgba(57,255,20,0.04),rgba(0,0,0,0.12))}
+  .console-panel{flex:1;padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(0,0,0,0.6),rgba(1,6,2,0.55));border:1px solid rgba(57,255,20,0.04);display:flex;flex-direction:column;overflow:hidden}
+  .console{background:#000;padding:12px;border-radius:6px;flex:1;overflow:auto;border:1px solid rgba(57,255,20,0.06);font-family:var(--mono);font-size:13px}
+  .line{white-space:pre-wrap;margin:4px 0}
+  .ts{color:#8aff7a;margin-right:8px;opacity:0.85}
+  .warn{color:#ffd24d}
+  .ok{color:var(--neon)}
+  .side-widgets{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+  .widget{padding:10px;border-radius:8px;background:linear-gradient(180deg,rgba(57,255,20,0.02),rgba(0,0,0,0.2));border:1px solid rgba(57,255,20,0.03);font-family:var(--mono)}
+  .tx-panel{margin-top:12px;padding:10px;border-radius:8px;background:linear-gradient(180deg,rgba(0,0,0,0.4),rgba(0,0,0,0.55));border:1px solid rgba(57,255,20,0.03);font-family:var(--mono);font-size:13px}
+  .tx-table{width:100%;border-collapse:collapse;margin-top:8px}
+  .tx-table th,.tx-table td{padding:6px;text-align:left;border-bottom:1px dashed rgba(57,255,20,0.03);font-size:12px}
+  .tx-table th{color:#9fffb0;font-weight:800}
+  .watermark{
+    position:fixed;right:12px;bottom:10px;font-size:11px;color:rgba(255,255,255,0.06);transform:rotate(-12deg);pointer-events:none;
+  }
+  @media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{height:auto;order:2}.main{order:1}.side-widgets{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Sidebar">
+      <div style="display:flex;gap:10px;align-items:center">
+        <div class="logo">PS</div>
+        <div>
+          <div style="font-weight:800;color:var(--neon)">Punch Admin</div>
+          <div style="color:#9fffb0;font-size:12px">Simulator — demo</div>
+        </div>
+      </div>
+
+      <nav class="menu" role="navigation" aria-label="Main menu">
+        <button id="menuLoad"><span style="font-size:12px;color:#9fffb0">[1]</span> Load Target</button>
+        <button id="menuTransfer"><span style="font-size:12px;color:#9fffb0">[2]</span> Simulate Transfer</button>
+        <button id="menuLogs"><span style="font-size:12px;color:#9fffb0">[3]</span> View Logs</button>
+        <button id="menuTx"><span style="font-size:12px;color:#9fffb0">[T]</span> Transactions</button>
+        <button id="menuLogout"><span style="font-size:12px;color:#9fffb0">[4]</span> Logout</button>
+      </nav>
+
+      <div class="notice">
+        ⚠️ Demo content only — all identifiers are fictional or masked. Do not use to represent real transactions.
+      </div>
+
+      <div style="margin-top:auto;font-size:12px;color:#9fffb0">
+        Session: <strong id="sessionId">guest_xxx</strong><br/>
+        Mode: <strong>Simulation</strong>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <div style="font-weight:900;font-family:var(--mono);color:var(--neon)">Hacker Admin Panel</div>
+          <div style="color:#9fffb0;font-size:12px">Use the controls to generate logs and transactions.</div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn primary" id="btnLoad">Load Target</button>
+          <button class="btn" id="btnTransfer">Simulate Transfer</button>
+          <button class="btn" id="btnViewLogs">View Logs</button>
+          <button class="btn" id="btnFakeTx">Fake Transaction</button>
+          <button class="btn" id="btnFakeMsg">Fake Message</button>
+          <button class="btn" id="btnFakePrankTx">Prank Tx</button>
+          <button class="btn" id="btnFakePrankConv">Prank Conv</button>
+          <button class="btn" id="btnLogout">Logout</button>
+        </div>
+      </div>
+
+      <section class="console-panel" aria-label="Console">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:800">Console</div>
+          <div style="color:#9fffb0">Time: <span id="nowTime"></span></div>
+        </div>
+
+        <div id="console" class="console" role="log" aria-live="polite"></div>
+
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <button class="btn" id="clearBtn">Clear</button>
+          <button class="btn" id="copyBtn">Copy Console</button>
+          <label style="margin-left:auto;color:#9fffb0"><input id="autoScroll" type="checkbox" checked/> Auto-scroll</label>
+        </div>
+
+        <div class="side-widgets">
+          <div class="widget">
+            <div style="font-weight:900">Transfer</div>
+            <div style="margin-top:8px">Status: <span id="transferStatus">idle</span></div>
+            <div style="margin-top:8px;color:#9fffb0;font-size:12px">Simulated transfer logs appear in console and transactions table.</div>
+          </div>
+
+          <div class="widget">
+            <div style="font-weight:900">Telemetry</div>
+            <div style="margin-top:8px">Peak: <span id="widgetPeak">0 N</span></div>
+            <div>Avg: <span id="widgetAvg">0.00 m/s</span></div>
+          </div>
+        </div>
+
+        <div class="tx-panel" id="txPanel">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:900">Transactions</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn" id="exportTx">Export CSV</button>
+              <button class="btn" id="clearTx">Clear</button>
+            </div>
+          </div>
+
+          <table class="tx-table" id="txTable" role="table" aria-label="Transaction history">
+            <thead><tr><th>#</th><th>Time</th><th>From</th><th>To</th><th>Amount</th><th>Method</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="watermark">DEMO</div>
+
+<script>
+  // ===== state & utilities (safe fake content) =====
+  const consoleEl = document.getElementById('console');
+  const nowTime = document.getElementById('nowTime');
+  const sessionId = document.getElementById('sessionId');
+  const txTableBody = document.querySelector('#txTable tbody');
+  const autoScrollCheckbox = document.getElementById('autoScroll');
+  const transferStatus = document.getElementById('transferStatus');
+  const widgetPeak = document.getElementById('widgetPeak');
+  const widgetAvg = document.getElementById('widgetAvg');
+
+  let state = {
+    session: 'guest_' + Math.floor(Math.random()*900+100),
+    history: [],
+    peak: 0,
+    totalSpeed: 0,
+    speedCount: 0,
+    transactions: []
+  };
+  sessionId.textContent = state.session;
+
+  function fmtTime(d=new Date()){ return d.toLocaleTimeString(); }
+  function ts(){ return '[' + fmtTime() + '] '; }
+  function rnd(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+  function randf(min,max,dec=2){ return (Math.random()*(max-min)+min).toFixed(dec); }
+
+  function appendLine(html, cls='line'){
+    const wrap = document.createElement('div'); wrap.className = cls;
+    const time = document.createElement('span'); time.className='ts'; time.textContent = ts();
+    const content = document.createElement('span'); content.innerHTML = html;
+    wrap.appendChild(time); wrap.appendChild(content);
+    consoleEl.appendChild(wrap);
+    const maxLines = 1200; while(consoleEl.children.length>maxLines) consoleEl.removeChild(consoleEl.firstChild);
+    if(autoScrollCheckbox.checked) consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  // safe masked placeholders
+  function maskedCard(){ return '**** **** **** ' + String(rnd(1000,9999)); }
+  function txId(){ return 'TX-' + Date.now().toString(36).slice(-6).toUpperCase() + '-' + rnd(10,999); }
+  function fakeName(){ const n=['Grandma','Alex','Sam','Taylor','Morgan','Pat','BizCorp','CoffeeCo']; return n[rnd(0,n.length-1)]; }
+
+  // ===== actions =====
+  function simulateLoadTarget(){
+    const targets = ['alpha-station.local','edge-proxy-12','target-device-x1'];
+    const t = targets[rnd(0,targets.length-1)];
+    appendLine(`Initiating load: ${t}`);
+    setTimeout(()=> {
+      const power=rnd(120,820), speed=randf(2.4,9.6,2);
+      state.history.push({power,speed}); state.peak=Math.max(state.peak,power); state.totalSpeed += parseFloat(speed); state.speedCount++;
+      appendLine(`Telemetry: peak=${power} N, speed=${speed} m/s`);
+      updateWidgets();
+    }, 600 + rnd(0,600));
+  }
+
+  function simulateTransfer(){
+    appendLine('Preparing transfer...');
+    transferStatus.textContent = 'in-progress';
+    setTimeout(()=> {
+      const to = fakeName();
+      const tx = createTransaction({from:'You', to: to, amount: randf(5,500,2), method: maskedCard(), note: 'transfer' });
+      appendLine(`Transfer completed: ${tx.id} → $${tx.amount} to ${to}`);
+      transferStatus.textContent = 'idle';
+    }, 800 + rnd(100,900));
+  }
+
+  function viewLogs(){
+    appendLine('Displaying recent logs:');
+    const n = Math.min(6, state.history.length);
+    if(n===0){ appendLine('  (no telemetry yet)'); return; }
+    for(let i=state.history.length-n;i<state.history.length;i++){
+      const h = state.history[i];
+      appendLine(`  log ${i+1}: peak=${h.power} N, speed=${h.speed} m/s`);
+    }
+  }
+
+  function createTransaction(overrides){
+    const names = ['Grandma','Alex','Sam','Taylor','Morgan','Pat','Charity','CoffeeCo'];
+    const from = overrides?.from ?? (Math.random()>0.4 ? 'You' : names[rnd(0,names.length-1)]);
+    const to   = overrides?.to   ?? (Math.random()>0.4 ? names[rnd(0,names.length-1)] : 'You');
+    const amount = overrides?.amount ?? randf(1,999,2);
+    const method = overrides?.method ?? ('CARD-XXXX-' + rnd(1000,9999));
+    const note = overrides?.note ?? ['groceries','rent','gift','loan'][rnd(0,3)];
+    const id = txId();
+    const t = new Date();
+    const tx = { id, t, from, to, amount, method, note };
+    state.transactions.unshift(tx);
+    renderTransactions();
+    return tx;
+  }
+
+  // "Prank" transaction — looks natural but all IDs are masked/fictional
+  function createPrankTransaction(){
+    const victim = 'You';
+    const target = fakeName() + (Math.random()>0.6 ? ' Jr' : '');
+    const amount = randf(8,350,2);
+    const method = maskedCard();
+    const id = txId();
+    const t = new Date();
+    const tx = { id, t, from: victim, to: target, amount, method, note: 'payment' };
+    state.transactions.unshift(tx);
+    appendLine(`Transaction ${id}: ${victim} → ${target} • $${amount} • ${method}`);
+    renderTransactions();
+    return tx;
+  }
+
+  // "Prank" conversation — plausible chat, no real sensitive specifics
+  function createPrankConversation(){
+    const contact = fakeName();
+    const convo = [
+      {who: contact, text: "Hey — I just hit one, send bread?"},
+      {who: "You", text: "On it. How much?"},
+      {who: contact, text: "$20 should cover it. Drop it now."},
+      {who: "You", text: "Sent. Check your app."},
+      {who: contact, text: "Got it, thanks! 🔥"}
+    ];
+    appendLine(`Conversation with ${contact}:`);
+    convo.forEach(line => {
+      const tag = line.who === 'You' ? '<span style="color:#9fffb0">You:</span>' : `<span style="color:#ffd24d">${line.who}:</span>`;
+      appendLine(`${tag} ${line.text}`);
+    });
+  }
+
+  // render transaction table
+  function renderTransactions(){
+    txTableBody.innerHTML = '';
+    state.transactions.forEach((tx, idx) => {
+      const row = document.createElement('tr');
+      const num = state.transactions.length - idx;
+      row.innerHTML = `<td>${num}</td><td>${tx.t.toLocaleString()}</td><td>${tx.from}</td><td>${tx.to}</td><td>$${tx.amount}</td><td>${tx.method}</td>`;
+      txTableBody.appendChild(row);
+    });
+  }
+
+  // export CSV with a demo header so file contains a clear metadata flag
+  function exportTxCSV(){
+    if(state.transactions.length === 0){ appendLine('No transactions to export.'); return; }
+    const rows = [['DEMO_DATA:true'], ['id','time','from','to','amount','method','note']];
+    state.transactions.slice().reverse().forEach(tx => {
+      rows.push([tx.id, tx.t.toISOString(), tx.from, tx.to, tx.amount, tx.method, tx.note || '']);
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'prank_transactions_demo.csv'; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 4000);
+    appendLine('Exported transactions (CSV).');
+  }
+
+  // simple updates
+  function updateWidgets(){
+    widgetPeak.textContent = (state.peak || 0) + ' N';
+    const avg = state.speedCount ? (state.totalSpeed / state.speedCount).toFixed(2) : '0.00';
+    widgetAvg.textContent = avg + ' m/s';
+  }
+
+  // UI wiring
+  document.getElementById('btnLoad').addEventListener('click', ()=> simulateLoadTarget());
+  document.getElementById('btnTransfer').addEventListener('click', ()=> simulateTransfer());
+  document.getElementById('btnViewLogs').addEventListener('click', ()=> viewLogs());
+  document.getElementById('btnFakeTx').addEventListener('click', ()=> { createTransaction(); });
+  document.getElementById('btnFakeMsg').addEventListener('click', ()=> { createPrankConversation(); });
+  document.getElementById('btnFakePrankTx').addEventListener('click', ()=> { createPrankTransaction(); });
+  document.getElementById('btnFakePrankConv').addEventListener('click', ()=> { createPrankConversation(); });
+  document.getElementById('btnLogout').addEventListener('click', ()=> {
+    appendLine('Session cleared. (demo)');
+    state.transactions = []; state.history = []; renderTransactions();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', ()=> { consoleEl.innerHTML=''; appendLine('Console cleared.'); });
+  document.getElementById('copyBtn').addEventListener('click', ()=> {
+    const text = Array.from(consoleEl.children).map(ch => ch.innerText).join('\n');
+    navigator.clipboard?.writeText(text).then(()=> appendLine('Console copied to clipboard.')).catch(()=> appendLine('Copy failed.'));
+  });
+  document.getElementById('exportTx').addEventListener('click', exportTxCSV);
+  document.getElementById('clearTx').addEventListener('click', ()=> { state.transactions=[]; renderTransactions(); appendLine('Transactions cleared.'); });
+
+  // sidebar handlers
+  document.getElementById('menuLoad').addEventListener('click', ()=> simulateLoadTarget());
+  document.getElementById('menuTransfer').addEventListener('click', ()=> simulateTransfer());
+  document.getElementById('menuLogs').addEventListener('click', ()=> viewLogs());
+  document.getElementById('menuTx').addEventListener('click', ()=> appendLine('Opening transactions...'));
+  document.getElementById('menuLogout').addEventListener('click', ()=> { state.transactions=[]; state.history=[]; renderTransactions(); appendLine('Logged out (demo).'); });
+
+  // time refresh
+  setInterval(()=> { nowTime.textContent = new Date().toLocaleTimeString(); }, 1000);
+
+  // seeded content so UI isn't empty
+  (function seed(){
+    appendLine('Demo started.');
+    simulateLoadTarget();
+    setTimeout(()=> simulateTransfer(), 900);
+    setTimeout(()=> createTransaction({from:'Grandma', to:'You', amount:'75.00', method: maskedCard(), note:'gift'}), 1500);
+    setTimeout(()=> createPrankConversation(), 2100);
+  })();
+</script>
+</body>
+</html>
